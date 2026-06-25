@@ -14,10 +14,10 @@
             <i class="fa-solid fa-mug-hot text-2xl text-amber-300"></i>
             <div>
                 <h1 class="text-xl font-bold tracking-tight">ECO-S Café</h1>
-                <p class="text-xs text-emerald-200">Optimización de Terceros Espacios</p>
+                <p class="text-xs text-emerald-200">Planta Física & Bienestar</p>
             </div>
         </div>
-        <a href="AQUÍ_PONES_EL_LINK_DE_TU_GOOGLE_FORMS" target="_blank" 
+        <a href="TU_LINK_DE_MICROSOFT_FORMS_AQUÍ" target="_blank" 
            class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg shadow transition duration-200 flex items-center space-x-2">
             <i class="fa-solid fa-plus"></i>
             <span>Solicitar Estación</span>
@@ -33,11 +33,11 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-600 mb-1">Buscar por Solicitante / Espacio</label>
-                    <input type="text" id="searchGlobal" oninput="filtrarDatos()" placeholder="Ej: Magistral, Planta física..." 
+                    <input type="text" id="searchGlobal" oninput="filtrarDatos()" placeholder="Ej: Magistral, L511..." 
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-600 mb-1">Fecha Específica</label>
+                    <label class="block text-sm font-medium text-slate-600 mb-1">Fecha del Servicio</label>
                     <input type="date" id="searchFecha" onchange="filtrarDatos()" 
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
@@ -51,36 +51,38 @@
 
         <div id="loading" class="text-center py-12">
             <i class="fa-solid fa-circle-notch animate-spin text-4xl text-emerald-600 mb-3"></i>
-            <p class="text-slate-500">Cargando cronograma de estaciones...</p>
+            <p class="text-slate-500">Cargando cronograma desde la nube institucional...</p>
         </div>
 
-        <div id="gridEstaciones" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
-            </div>
+        <div id="gridEstaciones" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden"></div>
 
         <div id="noResults" class="hidden text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
             <i class="fa-regular fa-calendar-times text-4xl text-slate-400 mb-2"></i>
-            <p class="text-slate-500 font-medium">No se encontraron estaciones programadas para esta selección.</p>
+            <p class="text-slate-500 font-medium">No hay estaciones programadas para esta selección.</p>
         </div>
     </main>
 
     <script>
-        // REEMPLAZA ESTA URL por la que te dé Google Apps Script en el Paso 2
-        const API_URL = "TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUÍ";
+        // Apunta al archivo JSON local que actualizará Power Automate
+        const DATA_FILE = "./estaciones.json"; 
         let datosOriginales = [];
 
         async function cargarEstaciones() {
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(DATA_FILE);
+                if (!response.ok) throw new Error("No se encontró el archivo de datos.");
+                
                 const data = await response.json();
-                datosOriginales = data.slice(1); // Omitimos la cabecera si viene incluida
+                // Omitimos la primera fila si son los encabezados (ID, Hora de inicio...)
+                datosOriginales = data.slice(1); 
+                
                 document.getElementById('loading').classList.add('hidden');
-                document.getElementById('gridEstaciones').classList.remove('hidden');
                 renderizarTarjetas(datosOriginales);
             } catch (error) {
-                console.error("Error al cargar los datos:", error);
+                console.error(error);
                 document.getElementById('loading').innerHTML = `
-                    <i class="fa-solid fa-circle-exclamation text-red-500 text-4xl mb-2"></i>
-                    <p class="text-red-600 font-medium">Error al conectar con la base de datos de Planta Física.</p>
+                    <i class="fa-solid fa-circle-exclamation text-amber-500 text-4xl mb-2"></i>
+                    <p class="text-slate-600 font-medium">Sincronizando primera base de datos o sin registros aún.</p>
                 `;
             }
         }
@@ -100,20 +102,19 @@
             noResults.classList.add('hidden');
 
             lista.forEach(row => {
-                // Estructura basada en tu archivo: 
-                // ID[0], Inicio[1], Fin[2], Fecha[3], Horario[4], Lugar[5], Insumos[6], Personas[7], Recargas[8], Solicitante[9]
+                // Mapeo exacto según tu CSV:
+                // [0]ID, [1]Inicio, [2]Fin, [3]Fecha, [4]Horario, [5]Lugar, [6]Insumos, [7]Cant, [8]Recargas, [9]Solicitante
                 const fecha = row[3] || 'N/A';
                 const horario = row[4] || 'N/A';
                 const lugar = row[5] || 'No asignado';
                 const insumos = row[6] ? row[6].split(';').filter(i => i.trim() !== '') : [];
                 const personas = row[7] || 'N/A';
                 const recargas = row[8] || 'Sin recargas';
-                const solicitante = row[9] || 'Anónimo';
+                const solicitante = row[9] || 'Área no especificada';
 
                 const tarjeta = document.createElement('div');
                 tarjeta.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition duration-200 flex flex-col justify-between";
                 
-                // Tags de insumos
                 let tagsHtml = insumos.map(i => `<span class="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2 py-1 rounded border border-emerald-200">${i.trim()}</span>`).join(' ');
 
                 tarjeta.innerHTML = `
@@ -129,7 +130,7 @@
                         <h3 class="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2">
                             <i class="fa-solid fa-location-dot text-emerald-600"></i> ${lugar}
                         </h3>
-                        <p class="text-sm text-slate-500 mb-4 flex items-center gap-1">
+                        <p class="text-sm text-slate-500 mb-4">
                             <i class="fa-solid fa-user text-xs"></i> <span class="font-medium">${solicitante}</span>
                         </p>
                         <div class="flex flex-wrap gap-1.5 mb-4">
@@ -137,7 +138,7 @@
                         </div>
                     </div>
                     <div class="bg-slate-50 px-5 py-3 border-t border-slate-100 flex justify-between text-xs text-slate-600">
-                        <span><i class="fa-solid fa-users text-slate-400"></i> Capacidad: <strong>${personas} pers.</strong></span>
+                        <span><i class="fa-solid fa-users text-slate-400"></i> Capacidad: <strong>${personas}</strong></span>
                         <span class="text-right truncate max-w-[150px]" title="${recargas}"><i class="fa-solid fa-rotate text-slate-400"></i> ${recargas}</span>
                     </div>
                 `;
@@ -154,16 +155,13 @@
                                     (row[5] && row[5].toLowerCase().includes(query)) || 
                                     (row[9] && row[9].toLowerCase().includes(query));
                 
-                // Formateo simple de fecha para comparar (YYYY-MM-DD)
                 let matchFecha = true;
                 if(fecha) {
                     const rowFecha = row[3] ? row[3].split('T')[0] : '';
                     matchFecha = rowFecha.includes(fecha);
                 }
-
                 return matchGlobal && matchFecha;
             });
-
             renderizarTarjetas(filtrados);
         }
 
@@ -173,7 +171,6 @@
             renderizarTarjetas(datosOriginales);
         }
 
-        // Ejecutar al cargar la página
         window.onload = cargarEstaciones;
     </script>
 </body>
