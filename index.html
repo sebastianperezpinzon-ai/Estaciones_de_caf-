@@ -74,7 +74,7 @@
                 
                 const data = await response.json();
                 // Omitimos la primera fila si son los encabezados (ID, Hora de inicio...)
-                datosOriginales = data.slice(1); 
+                datosOriginales = data; 
                 
                 document.getElementById('loading').classList.add('hidden');
                 renderizarTarjetas(datosOriginales);
