@@ -104,13 +104,13 @@
             lista.forEach(row => {
                 // Mapeo exacto según tu CSV:
                 // [0]ID, [1]Inicio, [2]Fin, [3]Fecha, [4]Horario, [5]Lugar, [6]Insumos, [7]Cant, [8]Recargas, [9]Solicitante
-                const fecha = row[3] || 'N/A';
-                const horario = row[4] || 'N/A';
-                const lugar = row[5] || 'No asignado';
-                const insumos = row[6] ? row[6].split(';').filter(i => i.trim() !== '') : [];
-                const personas = row[7] || 'N/A';
-                const recargas = row[8] || 'Sin recargas';
-                const solicitante = row[9] || 'Área no especificada';
+               const fecha = row.fecha || 'N/A';
+                const horario = row.horario || 'N/A';
+                const lugar = row.lugar || 'No asignado';
+                const insumos = row.insumos ? row.insumos.split(';').filter(i => i.trim() !== '') : [];
+                const personas = row.personas || 'N/A';
+                const recargas = row.recargas || 'Sin recargas';
+                const solicitante = row.solicitante || 'Área no especificada';
 
                 const tarjeta = document.createElement('div');
                 tarjeta.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition duration-200 flex flex-col justify-between";
