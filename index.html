@@ -10,6 +10,7 @@
         .eco-header { background-color: #2c3e50; color: white; padding: 20px 0; border-bottom: 5px solid #27ae60; }
         .card-estacion { border-left: 5px solid #27ae60; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .estado-pendiente { background-color: #f1c40f; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;}
+        .recarga-badge { background-color: #e8f8f5; color: #16a085; font-size: 0.85em; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px;}
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -28,8 +29,13 @@
                 <form id="formulario-estacion">
                     
                     <div class="mb-3">
+                        <label class="form-label text-muted">Solicitante (Área o Persona)</label>
+                        <input type="text" class="form-control" id="solicitante" placeholder="Ej: Dirección Académica, Juan Pérez..." required>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label text-muted">Ubicación / Salón o Espacio</label>
-                        <input type="text" class="form-control" id="ubicacion" placeholder="Ej: L511, Auditorio Fundadores, Sala Juntas..." required>
+                        <input type="text" class="form-control" id="ubicacion" placeholder="Ej: L511, Auditorio Fundadores..." required>
                     </div>
 
                     <div class="mb-3">
@@ -38,7 +44,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label text-muted">Insumos Requeridos (Selección múltiple)</label>
+                        <label class="form-label text-muted">Insumos Requeridos</label>
                         <div class="form-check">
                             <input class="form-check-input insumo-check" type="checkbox" value="Café" id="chkCafe">
                             <label class="form-check-label" for="chkCafe">Café (Termo 2L)</label>
@@ -53,7 +59,24 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-success w-100 mt-2">Registrar y Procesar</button>
+                    <div class="mb-3 border-top pt-3">
+                        <label class="form-label text-muted d-block">¿Lleva recargas?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="opcionRecarga" id="recargaSi" value="Si">
+                            <label class="form-check-label" for="recargaSi">Sí</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="opcionRecarga" id="recargaNo" value="No" checked>
+                            <label class="form-check-label" for="recargaNo">No</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-none" id="divHorasRecargas">
+                        <label class="form-label text-muted">Horarios de las recargas</label>
+                        <input type="text" class="form-control" id="horas_recargas" placeholder="Ej: 10:00 am y 3:00 pm">
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 mt-3">Registrar y Procesar</button>
                     <div id="mensaje-alerta" class="mt-3"></div>
                 </form>
             </div>
@@ -72,22 +95,29 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
-    // 2. AHORA SÍ EL NAVEGADOR SABE QUÉ ES "supabase" Y PODEMOS CONECTARNOS
     const SUPABASE_URL = 'https://dqylacedhygmmdyywsib.supabase.co'; 
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxeWxhY2VkaHlnbW1keXl3c2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDk2MDYsImV4cCI6MjA5ODAyNTYwNn0.YgAYtLk7MJOiEijg9fWkV0Em_COpKbfpg7bWz8pVQOo'; 
     
-    // Ajuste de seguridad para inicialización global en navegadores
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 3. FUNCIÓN PARA CARGAR LOS DATOS (El Dashboard)
+    // Lógica para mostrar/ocultar el campo de recargas
+    document.querySelectorAll('input[name="opcionRecarga"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const divHoras = document.getElementById('divHorasRecargas');
+            if (this.value === 'Si') {
+                divHoras.classList.remove('d-none');
+            } else {
+                divHoras.classList.add('d-none');
+                document.getElementById('horas_recargas').value = ''; // Limpiar el texto si se arrepiente
+            }
+        });
+    });
+
     async function cargarEstaciones() {
         const contenedor = document.getElementById('contenedor-tarjetas');
         contenedor.innerHTML = '<div class="text-center text-muted">Sincronizando sensores...</div>';
 
-        // Usamos la constante corregida supabaseClient
         const { data, error } = await supabaseClient
             .from('estaciones_cafe')
             .select('*')
@@ -108,17 +138,26 @@
 
         data.forEach(estacion => {
             const fechaOptimizada = new Date(estacion.fecha_requerida).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+            const solicitante = estacion.solicitante ? estacion.solicitante : 'Usuario no registrado';
+            
+            // Construir el bloque visual de recargas si aplica
+            let infoRecargas = '';
+            if (estacion.lleva_recargas === 'Si' && estacion.horas_recargas) {
+                infoRecargas = `<div class="recarga-badge">🔄 Recargas: ${estacion.horas_recargas}</div>`;
+            }
             
             const tarjeta = `
                 <div class="col-md-6">
                     <div class="card card-estacion p-3">
                         <div class="d-flex justify-content-between align-items-start">
                             <h5 class="card-title text-dark mb-1">📍 ${estacion.ubicacion}</h5>
-                            <span class="estado-pendiente">${estacion.estado}</span>
+                            <span class="estado-pendiente">${estacion.estado || 'Pendiente'}</span>
                         </div>
-                        <hr class="text-muted">
-                        <p class="card-text mb-1"><strong>⏰ Requerido para:</strong> <br> ${fechaOptimizada}</p>
-                        <p class="card-text"><strong>☕ Insumos:</strong> <br> ${estacion.insumos}</p>
+                        <p class="text-muted mb-2" style="font-size: 0.9em;">👤 ${solicitante}</p>
+                        <hr class="text-muted mt-1 mb-2">
+                        <p class="card-text mb-1"><strong>⏰ Inicio:</strong> ${fechaOptimizada}</p>
+                        <p class="card-text mb-1"><strong>☕ Insumos:</strong> ${estacion.insumos}</p>
+                        ${infoRecargas}
                     </div>
                 </div>
             `;
@@ -126,13 +165,20 @@
         });
     }
 
-    // 4. FUNCIÓN PARA GUARDAR DATOS (El Formulario)
     document.getElementById('formulario-estacion').addEventListener('submit', async function(e) {
         e.preventDefault(); 
 
+        const solicitante = document.getElementById('solicitante').value;
         const ubicacion = document.getElementById('ubicacion').value;
         const fechaReq = document.getElementById('fecha_requerida').value;
         
+        // Recargas
+        const llevaRecargas = document.querySelector('input[name="opcionRecarga"]:checked').value;
+        let horasRecargas = null;
+        if (llevaRecargas === 'Si') {
+            horasRecargas = document.getElementById('horas_recargas').value;
+        }
+
         const checkboxes = document.querySelectorAll('.insumo-check:checked');
         const insumosSeleccionados = Array.from(checkboxes).map(chk => chk.value).join(', ');
 
@@ -141,11 +187,17 @@
             return;
         }
 
-        // Usamos la constante corregida supabaseClient
         const { data, error } = await supabaseClient
             .from('estaciones_cafe')
             .insert([
-                { ubicacion: ubicacion, fecha_requerida: fechaReq, insumos: insumosSeleccionados }
+                { 
+                    solicitante: solicitante,
+                    ubicacion: ubicacion, 
+                    fecha_requerida: fechaReq, 
+                    insumos: insumosSeleccionados,
+                    lleva_recargas: llevaRecargas,
+                    horas_recargas: horasRecargas
+                }
             ]);
 
         if (error) {
@@ -153,6 +205,8 @@
         } else {
             mostrarAlerta('Datos guardados exitosamente. Optimizando insumos...', 'success');
             document.getElementById('formulario-estacion').reset(); 
+            // Ocultar de nuevo el campo de horas tras limpiar el form
+            document.getElementById('divHorasRecargas').classList.add('d-none');
             cargarEstaciones(); 
         }
     });
@@ -166,4 +220,5 @@
     window.onload = cargarEstaciones;
 </script>
 </body>
+</html>
 </html>
