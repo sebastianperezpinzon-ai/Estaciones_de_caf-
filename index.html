@@ -3,175 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECO-S | Sistema de Estaciones de Café</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>ECO-S | Logística de Espacios</title>
+    <!-- Bootstrap para un diseño limpio e institucional -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .eco-header { background-color: #2c3e50; color: white; padding: 20px 0; border-bottom: 5px solid #27ae60; }
+        .card-estacion { border-left: 5px solid #27ae60; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .estado-pendiente { background-color: #f1c40f; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;}
+    </style>
+    <!-- SDK de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+<body>
 
-    <nav class="bg-emerald-700 text-white shadow-md px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-3">
-            <i class="fa-solid fa-mug-hot text-2xl text-amber-300"></i>
-            <div>
-                <h1 class="text-xl font-bold tracking-tight">ECO-S Café</h1>
-                <p class="text-xs text-emerald-200">Planta Física & Bienestar</p>
+<div class="eco-header text-center mb-5">
+    <h1>ECO-S: Dashboard Logístico</h1>
+    <p>Gestión Inteligente y Sostenible de Insumos - Planta Física</p>
+</div>
+
+<div class="container-fluid px-5">
+    <div class="row">
+        <!-- SECCIÓN IZQUIERDA: FORMULARIO DE REGISTRO -->
+        <div class="col-md-4 mb-4">
+            <div class="card p-4 shadow-sm">
+                <h4 class="mb-3 text-success">Nueva Solicitud</h4>
+                <form id="formulario-estacion">
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Ubicación / Salón</label>
+                        <select class="form-select" id="ubicacion" required>
+                            <option value="">Selecciona el espacio...</option>
+                            <option value="Auditorio Principal">Auditorio Principal</option>
+                            <option value="Sala de Profesores - Piso 2">Sala de Profesores - Piso 2</option>
+                            <option value="Laboratorio de Innovación">Laboratorio de Innovación</option>
+                            <option value="Sala de Juntas B">Sala de Juntas B</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Fecha y Hora de la Sesión</label>
+                        <input type="datetime-local" class="form-control" id="fecha_requerida" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Insumos Requeridos (Selección múltiple)</label>
+                        <div class="form-check">
+                            <input class="form-check-input insumo-check" type="checkbox" value="Café" id="chkCafe">
+                            <label class="form-check-label" for="chkCafe">Café (Termo 2L)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input insumo-check" type="checkbox" value="Agua" id="chkAgua">
+                            <label class="form-check-label" for="chkAgua">Agua (Dispensador)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input insumo-check" type="checkbox" value="Aromática" id="chkAro">
+                            <label class="form-check-label" for="chkAro">Aromáticas variadas</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 mt-2">Registrar y Procesar</button>
+                    <div id="mensaje-alerta" class="mt-3"></div>
+                </form>
             </div>
         </div>
-        <a href="TU_LINK_DE_MICROSOFT_FORMS_AQUÍ" target="_blank" 
-           class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg shadow transition duration-200 flex items-center space-x-2">
-            <i class="fa-solid fa-plus"></i>
-            <span>Solicitar Estación</span>
-        </a>
-    </nav>
 
-    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- SECCIÓN DERECHA: DASHBOARD PREDICTIVO / TARJETAS -->
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-secondary">Monitoreo de Estaciones Activas</h4>
+                <button class="btn btn-outline-secondary btn-sm" onclick="cargarEstaciones()">↻ Actualizar Datos</button>
+            </div>
+            
+            <div id="contenedor-tarjetas" class="row">
+                <!-- Las tarjetas se inyectarán aquí mediante JavaScript -->
+                <div class="text-center text-muted mt-5">Cargando la red espacial...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. INICIALIZAR EL "CEREBRO" (Conexión a Supabase)
+    const SUPABASE_URL = 'https://dqylacedhygmmdyywsib.supabase.co/rest/v1/'; // Reemplazar aquí
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxeWxhY2VkaHlnbW1keXl3c2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDk2MDYsImV4cCI6MjA5ODAyNTYwNn0.YgAYtLk7MJOiEijg9fWkV0Em_COpKbfpg7bWz8pVQOo'; // Reemplazar aquí
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 2. FUNCIÓN PARA CARGAR LOS DATOS (El Dashboard)
+    async function cargarEstaciones() {
+        const contenedor = document.getElementById('contenedor-tarjetas');
+        contenedor.innerHTML = '<div class="text-center text-muted">Sincronizando sensores...</div>';
+
+        // Consulta a la base de datos: Traer todo, ordenado por fecha requerida
+        const { data, error } = await supabase
+            .from('estaciones_cafe')
+            .select('*')
+            .order('fecha_requerida', { ascending: true });
+
+        if (error) {
+            console.error("Error al cargar:", error);
+            contenedor.innerHTML = '<div class="alert alert-danger">Error conectando con la matriz de datos.</div>';
+            return;
+        }
+
+        contenedor.innerHTML = ''; // Limpiar contenedor
+
+        if (data.length === 0) {
+            contenedor.innerHTML = '<div class="text-center text-muted mt-4">No hay estaciones pendientes. El campus está optimizado.</div>';
+            return;
+        }
+
+        // Renderizar las tarjetas
+        data.forEach(estacion => {
+            // Formatear la fecha para que sea legible humana
+            const fechaOptimizada = new Date(estacion.fecha_requerida).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+            
+            const tarjeta = `
+                <div class="col-md-6">
+                    <div class="card card-estacion p-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h5 class="card-title text-dark mb-1">📍 ${estacion.ubicacion}</h5>
+                            <span class="estado-pendiente">${estacion.estado}</span>
+                        </div>
+                        <hr class="text-muted">
+                        <p class="card-text mb-1"><strong>⏰ Requerido para:</strong> <br> ${fechaOptimizada}</p>
+                        <p class="card-text"><strong>☕ Insumos:</strong> <br> ${estacion.insumos}</p>
+                    </div>
+                </div>
+            `;
+            contenedor.innerHTML += tarjeta;
+        });
+    }
+
+    // 3. FUNCIÓN PARA GUARDAR DATOS (El Formulario)
+    document.getElementById('formulario-estacion').addEventListener('submit', async function(e) {
+        e.preventDefault(); // Evita que la página recargue
+
+        // Recolectar datos del formulario
+        const ubicacion = document.getElementById('ubicacion').value;
+        const fechaReq = document.getElementById('fecha_requerida').value;
         
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
-            <h2 class="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-sliders text-emerald-600"></i> Filtros de Búsqueda
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-600 mb-1">Buscar por Solicitante / Espacio</label>
-                    <input type="text" id="searchGlobal" oninput="filtrarDatos()" placeholder="Ej: Magistral, L511..." 
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-600 mb-1">Fecha del Servicio</label>
-                    <input type="date" id="searchFecha" onchange="filtrarDatos()" 
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div class="flex items-end">
-                    <button onclick="limpiarFiltros()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg transition">
-                        Limpiar Filtros
-                    </button>
-                </div>
-            </div>
-        </div>
+        // Recolectar los checkboxes seleccionados
+        const checkboxes = document.querySelectorAll('.insumo-check:checked');
+        const insumosSeleccionados = Array.from(checkboxes).map(chk => chk.value).join(', ');
 
-        <div id="loading" class="text-center py-12">
-            <i class="fa-solid fa-circle-notch animate-spin text-4xl text-emerald-600 mb-3"></i>
-            <p class="text-slate-500">Cargando cronograma desde la nube institucional...</p>
-        </div>
-
-        <div id="gridEstaciones" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden"></div>
-
-        <div id="noResults" class="hidden text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
-            <i class="fa-regular fa-calendar-times text-4xl text-slate-400 mb-2"></i>
-            <p class="text-slate-500 font-medium">No hay estaciones programadas para esta selección.</p>
-        </div>
-    </main>
-
-    <script>
-        // Apunta al archivo JSON local que actualizará Power Automate
-        const DATA_FILE = "./estaciones.json"; 
-        let datosOriginales = [];
-
-        async function cargarEstaciones() {
-            try {
-                const response = await fetch(DATA_FILE);
-                if (!response.ok) throw new Error("No se encontró el archivo de datos.");
-                
-                const data = await response.json();
-                // Omitimos la primera fila si son los encabezados (ID, Hora de inicio...)
-                datosOriginales = data; 
-                
-                document.getElementById('loading').classList.add('hidden');
-                renderizarTarjetas(datosOriginales);
-            } catch (error) {
-                console.error(error);
-                document.getElementById('loading').innerHTML = `
-                    <i class="fa-solid fa-circle-exclamation text-amber-500 text-4xl mb-2"></i>
-                    <p class="text-slate-600 font-medium">Sincronizando primera base de datos o sin registros aún.</p>
-                `;
-            }
+        if(insumosSeleccionados === "") {
+            mostrarAlerta('Debes seleccionar al menos un insumo.', 'danger');
+            return;
         }
 
-        function renderizarTarjetas(lista) {
-            const grid = document.getElementById('gridEstaciones');
-            const noResults = document.getElementById('noResults');
-            grid.innerHTML = "";
+        // Enviar a Supabase
+        const { data, error } = await supabase
+            .from('estaciones_cafe')
+            .insert([
+                { ubicacion: ubicacion, fecha_requerida: fechaReq, insumos: insumosSeleccionados }
+            ]);
 
-            if(lista.length === 0) {
-                grid.classList.add('hidden');
-                noResults.classList.remove('hidden');
-                return;
-            }
-
-            grid.classList.remove('hidden');
-            noResults.classList.add('hidden');
-
-            lista.forEach(row => {
-                // Mapeo exacto según tu CSV:
-                // [0]ID, [1]Inicio, [2]Fin, [3]Fecha, [4]Horario, [5]Lugar, [6]Insumos, [7]Cant, [8]Recargas, [9]Solicitante
-               const fecha = row.fecha || 'N/A';
-                const horario = row.horario || 'N/A';
-                const lugar = row.lugar || 'No asignado';
-                const insumos = row.insumos ? row.insumos.split(';').filter(i => i.trim() !== '') : [];
-                const personas = row.personas || 'N/A';
-                const recargas = row.recargas || 'Sin recargas';
-                const solicitante = row.solicitante || 'Área no especificada';
-
-                const tarjeta = document.createElement('div');
-                tarjeta.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition duration-200 flex flex-col justify-between";
-                
-                let tagsHtml = insumos.map(i => `<span class="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2 py-1 rounded border border-emerald-200">${i.trim()}</span>`).join(' ');
-
-                tarjeta.innerHTML = `
-                    <div class="p-5">
-                        <div class="flex justify-between items-start mb-3">
-                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                                <i class="fa-regular fa-calendar"></i> ${fecha}
-                            </span>
-                            <span class="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                                <i class="fa-regular fa-clock"></i> ${horario}
-                            </span>
-                        </div>
-                        <h3 class="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2">
-                            <i class="fa-solid fa-location-dot text-emerald-600"></i> ${lugar}
-                        </h3>
-                        <p class="text-sm text-slate-500 mb-4">
-                            <i class="fa-solid fa-user text-xs"></i> <span class="font-medium">${solicitante}</span>
-                        </p>
-                        <div class="flex flex-wrap gap-1.5 mb-4">
-                            ${tagsHtml}
-                        </div>
-                    </div>
-                    <div class="bg-slate-50 px-5 py-3 border-t border-slate-100 flex justify-between text-xs text-slate-600">
-                        <span><i class="fa-solid fa-users text-slate-400"></i> Capacidad: <strong>${personas}</strong></span>
-                        <span class="text-right truncate max-w-[150px]" title="${recargas}"><i class="fa-solid fa-rotate text-slate-400"></i> ${recargas}</span>
-                    </div>
-                `;
-                grid.appendChild(tarjeta);
-            });
+        if (error) {
+            mostrarAlerta('Error en la comunicación espacial: ' + error.message, 'danger');
+        } else {
+            mostrarAlerta('Datos guardados exitosamente. Optimizando insumos...', 'success');
+            document.getElementById('formulario-estacion').reset(); // Limpiar formulario
+            cargarEstaciones(); // Refrescar el dashboard inmediatamente
         }
+    });
 
-        function filtrarDatos() {
-            const query = document.getElementById('searchGlobal').value.toLowerCase();
-            const fecha = document.getElementById('searchFecha').value;
+    // Función auxiliar para mostrar mensajes
+    function mostrarAlerta(mensaje, tipo) {
+        const alertaDiv = document.getElementById('mensaje-alerta');
+        alertaDiv.innerHTML = `<div class="alert alert-${tipo}">${mensaje}</div>`;
+        setTimeout(() => alertaDiv.innerHTML = '', 4000); // Borrar después de 4 segundos
+    }
 
-            const filtrados = datosOriginales.filter(row => {
-                const matchGlobal = !query || 
-                                    (row[5] && row[5].toLowerCase().includes(query)) || 
-                                    (row[9] && row[9].toLowerCase().includes(query));
-                
-                let matchFecha = true;
-                if(fecha) {
-                    const rowFecha = row[3] ? row[3].split('T')[0] : '';
-                    matchFecha = rowFecha.includes(fecha);
-                }
-                return matchGlobal && matchFecha;
-            });
-            renderizarTarjetas(filtrados);
-        }
+    // Cargar los datos tan pronto se abre la página
+    window.onload = cargarEstaciones;
 
-        function limpiarFiltros() {
-            document.getElementById('searchGlobal').value = "";
-            document.getElementById('searchFecha').value = "";
-            renderizarTarjetas(datosOriginales);
-        }
-
-        window.onload = cargarEstaciones;
-    </script>
+</script>
 </body>
 </html>
