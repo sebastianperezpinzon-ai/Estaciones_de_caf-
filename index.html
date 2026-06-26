@@ -8,11 +8,19 @@
     <style>
         body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .eco-header { background-color: #2c3e50; color: white; padding: 20px 0; border-bottom: 5px solid #27ae60; }
-        .card-estacion { border-left: 5px solid #27ae60; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        /* Estados de las tarjetas */
+        .card-pendiente { border-left: 5px solid #f1c40f; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .card-instalada { border-left: 5px solid #2ecc71; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); background-color: #fdfdfd; }
+        
+        /* Badges de Estado */
         .estado-pendiente { background-color: #f1c40f; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;}
+        .estado-instalado { background-color: #2ecc71; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;}
+        
         .recarga-badge { background-color: #e8f8f5; color: #16a085; font-size: 0.85em; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px;}
         .filter-bar { background-color: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e9ecef;}
         .btn-fecha-extra { font-size: 0.85em; padding: 3px 8px; margin-top: 5px; }
+        .zona-supervisor { background-color: #f8f9fa; border-top: 1px dashed #dee2e6; padding-top: 10px; margin-top: 10px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -58,8 +66,7 @@
                         
                         <div id="divMultiplesFechas" class="d-none mt-2 p-2 border rounded bg-light">
                             <label class="form-label text-muted mb-1" style="font-size: 0.85em;">Fechas adicionales:</label>
-                            <div id="contenedor-fechas-extras">
-                                </div>
+                            <div id="contenedor-fechas-extras"></div>
                             <button type="button" class="btn btn-outline-success btn-fecha-extra" onclick="agregarCampoFecha()">+ Añadir otra fecha</button>
                         </div>
                     </div>
@@ -140,20 +147,15 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let todasLasEstaciones = [];
 
-    // Lógica para mostrar/ocultar el campo de recargas
+    // Lógicas de UI del Formulario (Ocultar/Mostrar campos)
     document.querySelectorAll('input[name="opcionRecarga"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const divHoras = document.getElementById('divHorasRecargas');
-            if (this.value === 'Si') {
-                divHoras.classList.remove('d-none');
-            } else {
-                divHoras.classList.add('d-none');
-                document.getElementById('horas_recargas').value = ''; 
-            }
+            if (this.value === 'Si') { divHoras.classList.remove('d-none'); } 
+            else { divHoras.classList.add('d-none'); document.getElementById('horas_recargas').value = ''; }
         });
     });
 
-    // Lógica para mostrar/ocultar el panel de múltiples fechas
     document.querySelectorAll('input[name="opcionMultiplesFechas"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const divMulti = document.getElementById('divMultiplesFechas');
@@ -161,22 +163,18 @@
             if (this.value === 'Si') {
                 divMulti.classList.remove('d-none');
                 labelFecha.innerText = 'Fecha y Hora (Sesión 1)';
-                if(document.getElementById('contenedor-fechas-extras').children.length === 0) {
-                    agregarCampoFecha(); // Agregar una por defecto
-                }
+                if(document.getElementById('contenedor-fechas-extras').children.length === 0) { agregarCampoFecha(); }
             } else {
                 divMulti.classList.add('d-none');
                 labelFecha.innerText = 'Fecha y Hora de la Sesión';
-                document.getElementById('contenedor-fechas-extras').innerHTML = ''; // Limpiar campos extras
+                document.getElementById('contenedor-fechas-extras').innerHTML = '';
             }
         });
     });
 
-    // Función para añadir campos dinámicos de fechas adicionales
     function agregarCampoFecha() {
         const contenedor = document.getElementById('contenedor-fechas-extras');
         const numeroSesion = contenedor.children.length + 2;
-        
         const divGrupo = document.createElement('div');
         divGrupo.className = 'input-group mb-2';
         divGrupo.innerHTML = `
@@ -194,7 +192,7 @@
         });
     }
 
-    // Cargar datos de Supabase
+    // Cargar datos desde Supabase
     async function cargarEstaciones() {
         const contenedor = document.getElementById('contenedor-tarjetas');
         contenedor.innerHTML = '<div class="text-center text-muted">Sincronizando sensores...</div>';
@@ -205,7 +203,7 @@
             .order('fecha_requerida', { ascending: true });
 
         if (error) {
-            console.error("Error al cargar:", error);
+            console.error("Error:", error);
             contenedor.innerHTML = '<div class="alert alert-danger">Error conectando con la matriz de datos.</div>';
             return;
         }
@@ -223,11 +221,8 @@
             const ubicacionMatch = estacion.ubicacion.toLowerCase().includes(valUbicacion);
             const solicitante = estacion.solicitante ? estacion.solicitante.toLowerCase() : '';
             const solicitanteMatch = solicitante.includes(valSolicitante);
-            
             let fechaMatch = true;
-            if (valFecha) {
-                fechaMatch = estacion.fecha_requerida.startsWith(valFecha);
-            }
+            if (valFecha) { fechaMatch = estacion.fecha_requerida.startsWith(valFecha); }
 
             return ubicacionMatch && solicitanteMatch && fechaMatch;
         });
@@ -248,23 +243,50 @@
             const fechaOptimizada = new Date(estacion.fecha_requerida).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
             const solicitante = estacion.solicitante ? estacion.solicitante : 'Usuario no registrado';
             
+            // Evaluar estado actual de la fila
+            const esInstalado = estacion.estado === 'Instalado';
+            const claseCard = esInstalado ? 'card-instalada' : 'card-pendiente';
+            const claseBadge = esInstalado ? 'estado-instalado' : 'estado-pendiente';
+            const textoEstado = esInstalado ? '✓ Instalado' : 'Pendiente';
+            
             let infoRecargas = '';
             if (estacion.lleva_recargas === 'Si' && estacion.horas_recargas) {
                 infoRecargas = `<div class="recarga-badge">🔄 Recargas: ${estacion.horas_recargas}</div>`;
             }
             
+            // NUEVO: Bloque interactivo para el Supervisor/Verificador
+            let bloqueSupervisor = '';
+            if (!esInstalado) {
+                bloqueSupervisor = `
+                    <div class="zona-supervisor">
+                        <input type="text" id="nov-${estacion.id}" class="form-control form-control-sm mb-2" placeholder="Escribir novedad u observación (Opcional)">
+                        <button class="btn btn-success btn-sm w-100" onclick="confirmarInstalacion(${estacion.id})">✓ Confirmar Instalación</button>
+                    </div>
+                `;
+            } else {
+                // Si ya está instalado, mostramos la novedad fija si existe
+                const novedadGuardada = estacion.novedades ? estacion.novedades : 'Ninguna novedad registrada.';
+                bloqueSupervisor = `
+                    <div class="zona-supervisor text-secondary" style="font-size: 0.85em;">
+                        <strong>📝 Reporte de instalación:</strong> <br>
+                        <span class="text-dark italic">${novedadGuardada}</span>
+                    </div>
+                `;
+            }
+            
             const tarjeta = `
                 <div class="col-md-6">
-                    <div class="card card-estacion p-3">
+                    <div class="card ${claseCard} p-3">
                         <div class="d-flex justify-content-between align-items-start">
                             <h5 class="card-title text-dark mb-1">📍 ${estacion.ubicacion}</h5>
-                            <span class="estado-pendiente">${estacion.estado || 'Pendiente'}</span>
+                            <span class="${claseBadge}">${textoEstado}</span>
                         </div>
                         <p class="text-muted mb-2" style="font-size: 0.9em;">👤 ${solicitante}</p>
                         <hr class="text-muted mt-1 mb-2">
                         <p class="card-text mb-1"><strong>⏰ Inicio:</strong> ${fechaOptimizada}</p>
                         <p class="card-text mb-1"><strong>☕ Insumos:</strong> ${estacion.insumos}</p>
                         ${infoRecargas}
+                        ${bloqueSupervisor}
                     </div>
                 </div>
             `;
@@ -272,11 +294,33 @@
         });
     }
 
+    // NUEVA FUNCIÓN: Envía la actualización de estado y novedad a Supabase
+    async function confirmarInstalacion(idEstacion) {
+        const inputNovedad = document.getElementById(`nov-${idEstacion}`);
+        const textoNovedad = inputNovedad.value.trim();
+
+        // Actualizamos la fila específica en Supabase usando el ID
+        const { data, error } = await supabaseClient
+            .from('estaciones_cafe')
+            .update({ 
+                estado: 'Instalado', 
+                novedades: textoNovedad || 'Instalado sin novedades' 
+            })
+            .eq('id', idEstacion);
+
+        if (error) {
+            alert('Error al actualizar el estado: ' + error.message);
+        } else {
+            // Recargamos el dashboard visual instantáneamente
+            cargarEstaciones();
+        }
+    }
+
     document.getElementById('filtro-ubicacion').addEventListener('input', aplicarFiltros);
     document.getElementById('filtro-solicitante').addEventListener('input', aplicarFiltros);
     document.getElementById('filtro-fecha').addEventListener('change', aplicarFiltros);
 
-    // Guardado de Datos Eficiente (Multi-Row Insert)
+    // Registro de nuevas solicitudes (soporta multi-fechas)
     document.getElementById('formulario-estacion').addEventListener('submit', async function(e) {
         e.preventDefault(); 
 
@@ -286,9 +330,7 @@
         
         const llevaRecargas = document.querySelector('input[name="opcionRecarga"]:checked').value;
         let horasRecargas = null;
-        if (llevaRecargas === 'Si') {
-            horasRecargas = document.getElementById('horas_recargas').value;
-        }
+        if (llevaRecargas === 'Si') { horasRecargas = document.getElementById('horas_recargas').value; }
 
         const checkboxes = document.querySelectorAll('.insumo-check:checked');
         const insumosSeleccionados = Array.from(checkboxes).map(chk => chk.value).join(', ');
@@ -298,38 +340,28 @@
             return;
         }
 
-        // --- MATRIZ LOGÍSTICA DE FECHAS ---
-        // Inicializamos el array con la primera fecha
         let filasAInsertar = [
             { 
-                solicitante: solicitante,
-                ubicacion: ubicacion, 
-                fecha_requerida: fechaPrincipal, 
-                insumos: insumosSeleccionados,
-                lleva_recargas: llevaRecargas,
-                horas_recargas: horasRecargas
+                solicitante: solicitante, ubicacion: ubicacion, fecha_requerida: fechaPrincipal, 
+                insumos: insumosSeleccionados, lleva_recargas: llevaRecargas, horas_recargas: horasRecargas,
+                estado: 'Pendiente' // Se guardan inicialmente como pendientes
             }
         ];
 
-        // Si seleccionó que son varias fechas, recolectamos las extras
         const esMultiFecha = document.querySelector('input[name="opcionMultiplesFechas"]:checked').value;
         if (esMultiFecha === 'Si') {
             const inputsExtra = document.querySelectorAll('.fecha-extra-input');
             inputsExtra.forEach(input => {
                 if(input.value) {
                     filasAInsertar.push({
-                        solicitante: solicitante,
-                        ubicacion: ubicacion, 
-                        fecha_requerida: input.value, 
-                        insumos: insumosSeleccionados,
-                        lleva_recargas: llevaRecargas,
-                        horas_recargas: horasRecargas
+                        solicitante: solicitante, ubicacion: ubicacion, fecha_requerida: input.value, 
+                        insumos: insumosSeleccionados, lleva_recargas: llevaRecargas, horas_recargas: horasRecargas,
+                        estado: 'Pendiente'
                     });
                 }
             });
         }
 
-        // Enviamos toda la lista a Supabase en una sola petición HTTP
         const { data, error } = await supabaseClient
             .from('estaciones_cafe')
             .insert(filasAInsertar);
@@ -337,7 +369,7 @@
         if (error) {
             mostrarAlerta('Error en la comunicación: ' + error.message, 'danger');
         } else {
-            mostrarAlerta(`¡Éxito! Se han registrado ${filasAInsertar.length} solicitudes automáticamente.`, 'success');
+            mostrarAlerta(`¡Éxito! Se han registrado ${filasAInsertar.length} solicitudes.`, 'success');
             document.getElementById('formulario-estacion').reset(); 
             document.getElementById('divHorasRecargas').classList.add('d-none');
             document.getElementById('divMultiplesFechas').classList.add('d-none');
