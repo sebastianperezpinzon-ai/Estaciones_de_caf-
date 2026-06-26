@@ -72,18 +72,23 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
-    // 1. INICIALIZAR LA CONEXIÓN A SUPABASE (Credenciales integradas de forma óptima)
+    // 2. AHORA SÍ EL NAVEGADOR SABE QUÉ ES "supabase" Y PODEMOS CONECTARNOS
     const SUPABASE_URL = 'https://dqylacedhygmmdyywsib.supabase.co'; 
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxeWxhY2VkaHlnbW1keXl3c2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDk2MDYsImV4cCI6MjA5ODAyNTYwNn0.YgAYtLk7MJOiEijg9fWkV0Em_COpKbfpg7bWz8pVQOo'; 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    // Ajuste de seguridad para inicialización global en navegadores
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 2. FUNCIÓN PARA CARGAR LOS DATOS (El Dashboard)
+    // 3. FUNCIÓN PARA CARGAR LOS DATOS (El Dashboard)
     async function cargarEstaciones() {
         const contenedor = document.getElementById('contenedor-tarjetas');
         contenedor.innerHTML = '<div class="text-center text-muted">Sincronizando sensores...</div>';
 
-        const { data, error } = await supabase
+        // Usamos la constante corregida supabaseClient
+        const { data, error } = await supabaseClient
             .from('estaciones_cafe')
             .select('*')
             .order('fecha_requerida', { ascending: true });
@@ -121,7 +126,7 @@
         });
     }
 
-    // 3. FUNCIÓN PARA GUARDAR DATOS (El Formulario)
+    // 4. FUNCIÓN PARA GUARDAR DATOS (El Formulario)
     document.getElementById('formulario-estacion').addEventListener('submit', async function(e) {
         e.preventDefault(); 
 
@@ -136,7 +141,8 @@
             return;
         }
 
-        const { data, error } = await supabase
+        // Usamos la constante corregida supabaseClient
+        const { data, error } = await supabaseClient
             .from('estaciones_cafe')
             .insert([
                 { ubicacion: ubicacion, fecha_requerida: fechaReq, insumos: insumosSeleccionados }
@@ -147,7 +153,7 @@
         } else {
             mostrarAlerta('Datos guardados exitosamente. Optimizando insumos...', 'success');
             document.getElementById('formulario-estacion').reset(); 
-            cargarEstaciones(); // Refrescar el panel visual instantáneamente
+            cargarEstaciones(); 
         }
     });
 
