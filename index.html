@@ -12,6 +12,7 @@
         .estado-pendiente { background-color: #f1c40f; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;}
         .recarga-badge { background-color: #e8f8f5; color: #16a085; font-size: 0.85em; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px;}
         .filter-bar { background-color: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e9ecef;}
+        .btn-fecha-extra { font-size: 0.85em; padding: 3px 8px; margin-top: 5px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -40,8 +41,27 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label text-muted">Fecha y Hora de la Sesión</label>
+                        <label class="form-label text-muted" id="label-fecha">Fecha y Hora de la Sesión</label>
                         <input type="datetime-local" class="form-control" id="fecha_requerida" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted d-block" style="font-size: 0.9em;">¿La solicitud aplica para varias fechas?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="opcionMultiplesFechas" id="multiFechasSi" value="Si">
+                            <label class="form-check-label" for="multiFechasSi">Sí</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="opcionMultiplesFechas" id="multiFechasNo" value="No" checked>
+                            <label class="form-check-label" for="multiFechasNo">No</label>
+                        </div>
+                        
+                        <div id="divMultiplesFechas" class="d-none mt-2 p-2 border rounded bg-light">
+                            <label class="form-label text-muted mb-1" style="font-size: 0.85em;">Fechas adicionales:</label>
+                            <div id="contenedor-fechas-extras">
+                                </div>
+                            <button type="button" class="btn btn-outline-success btn-fecha-extra" onclick="agregarCampoFecha()">+ Añadir otra fecha</button>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -118,8 +138,6 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxeWxhY2VkaHlnbW1keXl3c2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDk2MDYsImV4cCI6MjA5ODAyNTYwNn0.YgAYtLk7MJOiEijg9fWkV0Em_COpKbfpg7bWz8pVQOo'; 
     
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // Variable global para guardar los datos originales y poder filtrarlos
     let todasLasEstaciones = [];
 
     // Lógica para mostrar/ocultar el campo de recargas
@@ -135,7 +153,48 @@
         });
     });
 
-    // Función principal que trae los datos de Supabase
+    // Lógica para mostrar/ocultar el panel de múltiples fechas
+    document.querySelectorAll('input[name="opcionMultiplesFechas"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const divMulti = document.getElementById('divMultiplesFechas');
+            const labelFecha = document.getElementById('label-fecha');
+            if (this.value === 'Si') {
+                divMulti.classList.remove('d-none');
+                labelFecha.innerText = 'Fecha y Hora (Sesión 1)';
+                if(document.getElementById('contenedor-fechas-extras').children.length === 0) {
+                    agregarCampoFecha(); // Agregar una por defecto
+                }
+            } else {
+                divMulti.classList.add('d-none');
+                labelFecha.innerText = 'Fecha y Hora de la Sesión';
+                document.getElementById('contenedor-fechas-extras').innerHTML = ''; // Limpiar campos extras
+            }
+        });
+    });
+
+    // Función para añadir campos dinámicos de fechas adicionales
+    function agregarCampoFecha() {
+        const contenedor = document.getElementById('contenedor-fechas-extras');
+        const numeroSesion = contenedor.children.length + 2;
+        
+        const divGrupo = document.createElement('div');
+        divGrupo.className = 'input-group mb-2';
+        divGrupo.innerHTML = `
+            <span class="input-group-text bg-white text-muted" style="font-size:0.8em;">#${numeroSesion}</span>
+            <input type="datetime-local" class="form-control form-control-sm fecha-extra-input" required>
+            <button class="btn btn-outline-danger btn-sm" type="button" onclick="this.parentElement.remove(); actualizarNumeracionFechas();">✕</button>
+        `;
+        contenedor.appendChild(divGrupo);
+    }
+
+    function actualizarNumeracionFechas() {
+        const contenedor = document.getElementById('contenedor-fechas-extras');
+        Array.from(contenedor.children).forEach((div, index) => {
+            div.querySelector('.input-group-text').innerText = `#${index + 2}`;
+        });
+    }
+
+    // Cargar datos de Supabase
     async function cargarEstaciones() {
         const contenedor = document.getElementById('contenedor-tarjetas');
         contenedor.innerHTML = '<div class="text-center text-muted">Sincronizando sensores...</div>';
@@ -151,18 +210,14 @@
             return;
         }
 
-        // Guardamos los datos en la variable global
         todasLasEstaciones = data;
-        
-        // Llamamos a la función de filtrado inicial (mostrará todo porque los filtros están vacíos)
         aplicarFiltros();
     }
 
-    // NUEVA FUNCIÓN: Lógica de filtrado en tiempo real
     function aplicarFiltros() {
         const valUbicacion = document.getElementById('filtro-ubicacion').value.toLowerCase();
         const valSolicitante = document.getElementById('filtro-solicitante').value.toLowerCase();
-        const valFecha = document.getElementById('filtro-fecha').value; // Formato YYYY-MM-DD
+        const valFecha = document.getElementById('filtro-fecha').value; 
 
         const datosFiltrados = todasLasEstaciones.filter(estacion => {
             const ubicacionMatch = estacion.ubicacion.toLowerCase().includes(valUbicacion);
@@ -171,7 +226,6 @@
             
             let fechaMatch = true;
             if (valFecha) {
-                // Compara si la fecha guardada empieza con la fecha seleccionada en el filtro
                 fechaMatch = estacion.fecha_requerida.startsWith(valFecha);
             }
 
@@ -181,7 +235,6 @@
         renderizarTarjetas(datosFiltrados);
     }
 
-    // NUEVA FUNCIÓN: Dibuja las tarjetas en pantalla basándose en los datos que reciba
     function renderizarTarjetas(datos) {
         const contenedor = document.getElementById('contenedor-tarjetas');
         contenedor.innerHTML = ''; 
@@ -219,18 +272,17 @@
         });
     }
 
-    // Event Listeners para que los filtros funcionen mientras se escribe o selecciona
     document.getElementById('filtro-ubicacion').addEventListener('input', aplicarFiltros);
     document.getElementById('filtro-solicitante').addEventListener('input', aplicarFiltros);
     document.getElementById('filtro-fecha').addEventListener('change', aplicarFiltros);
 
-    // Registro de nueva estación
+    // Guardado de Datos Eficiente (Multi-Row Insert)
     document.getElementById('formulario-estacion').addEventListener('submit', async function(e) {
         e.preventDefault(); 
 
         const solicitante = document.getElementById('solicitante').value;
         const ubicacion = document.getElementById('ubicacion').value;
-        const fechaReq = document.getElementById('fecha_requerida').value;
+        const fechaPrincipal = document.getElementById('fecha_requerida').value;
         
         const llevaRecargas = document.querySelector('input[name="opcionRecarga"]:checked').value;
         let horasRecargas = null;
@@ -246,25 +298,51 @@
             return;
         }
 
+        // --- MATRIZ LOGÍSTICA DE FECHAS ---
+        // Inicializamos el array con la primera fecha
+        let filasAInsertar = [
+            { 
+                solicitante: solicitante,
+                ubicacion: ubicacion, 
+                fecha_requerida: fechaPrincipal, 
+                insumos: insumosSeleccionados,
+                lleva_recargas: llevaRecargas,
+                horas_recargas: horasRecargas
+            }
+        ];
+
+        // Si seleccionó que son varias fechas, recolectamos las extras
+        const esMultiFecha = document.querySelector('input[name="opcionMultiplesFechas"]:checked').value;
+        if (esMultiFecha === 'Si') {
+            const inputsExtra = document.querySelectorAll('.fecha-extra-input');
+            inputsExtra.forEach(input => {
+                if(input.value) {
+                    filasAInsertar.push({
+                        solicitante: solicitante,
+                        ubicacion: ubicacion, 
+                        fecha_requerida: input.value, 
+                        insumos: insumosSeleccionados,
+                        lleva_recargas: llevaRecargas,
+                        horas_recargas: horasRecargas
+                    });
+                }
+            });
+        }
+
+        // Enviamos toda la lista a Supabase en una sola petición HTTP
         const { data, error } = await supabaseClient
             .from('estaciones_cafe')
-            .insert([
-                { 
-                    solicitante: solicitante,
-                    ubicacion: ubicacion, 
-                    fecha_requerida: fechaReq, 
-                    insumos: insumosSeleccionados,
-                    lleva_recargas: llevaRecargas,
-                    horas_recargas: horasRecargas
-                }
-            ]);
+            .insert(filasAInsertar);
 
         if (error) {
             mostrarAlerta('Error en la comunicación: ' + error.message, 'danger');
         } else {
-            mostrarAlerta('Datos guardados exitosamente.', 'success');
+            mostrarAlerta(`¡Éxito! Se han registrado ${filasAInsertar.length} solicitudes automáticamente.`, 'success');
             document.getElementById('formulario-estacion').reset(); 
             document.getElementById('divHorasRecargas').classList.add('d-none');
+            document.getElementById('divMultiplesFechas').classList.add('d-none');
+            document.getElementById('contenedor-fechas-extras').innerHTML = '';
+            document.getElementById('label-fecha').innerText = 'Fecha y Hora de la Sesión';
             cargarEstaciones(); 
         }
     });
@@ -272,7 +350,7 @@
     function mostrarAlerta(mensaje, tipo) {
         const alertaDiv = document.getElementById('mensaje-alerta');
         alertaDiv.innerHTML = `<div class="alert alert-${tipo}">${mensaje}</div>`;
-        setTimeout(() => alertaDiv.innerHTML = '', 4000); 
+        setTimeout(() => alertaDiv.innerHTML = '', 4500); 
     }
 
     window.onload = cargarEstaciones;
