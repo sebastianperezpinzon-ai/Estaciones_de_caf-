@@ -11,6 +11,7 @@
         .card-estacion { border-left: 5px solid #27ae60; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .estado-pendiente { background-color: #f1c40f; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;}
         .recarga-badge { background-color: #e8f8f5; color: #16a085; font-size: 0.85em; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px;}
+        .filter-bar { background-color: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e9ecef;}
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -88,6 +89,23 @@
                 <button class="btn btn-outline-secondary btn-sm" onclick="cargarEstaciones()">↻ Actualizar Datos</button>
             </div>
             
+            <div class="filter-bar">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label text-muted" style="font-size: 0.8em;">Filtrar por Espacio</label>
+                        <input type="text" id="filtro-ubicacion" class="form-control form-control-sm" placeholder="Ej: L511">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted" style="font-size: 0.8em;">Filtrar por Solicitante</label>
+                        <input type="text" id="filtro-solicitante" class="form-control form-control-sm" placeholder="Ej: Juan">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted" style="font-size: 0.8em;">Filtrar por Fecha</label>
+                        <input type="date" id="filtro-fecha" class="form-control form-control-sm">
+                    </div>
+                </div>
+            </div>
+
             <div id="contenedor-tarjetas" class="row">
                 <div class="text-center text-muted mt-5">Cargando la red espacial...</div>
             </div>
@@ -101,6 +119,9 @@
     
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Variable global para guardar los datos originales y poder filtrarlos
+    let todasLasEstaciones = [];
+
     // Lógica para mostrar/ocultar el campo de recargas
     document.querySelectorAll('input[name="opcionRecarga"]').forEach(radio => {
         radio.addEventListener('change', function() {
@@ -109,11 +130,12 @@
                 divHoras.classList.remove('d-none');
             } else {
                 divHoras.classList.add('d-none');
-                document.getElementById('horas_recargas').value = ''; // Limpiar el texto si se arrepiente
+                document.getElementById('horas_recargas').value = ''; 
             }
         });
     });
 
+    // Función principal que trae los datos de Supabase
     async function cargarEstaciones() {
         const contenedor = document.getElementById('contenedor-tarjetas');
         contenedor.innerHTML = '<div class="text-center text-muted">Sincronizando sensores...</div>';
@@ -129,18 +151,50 @@
             return;
         }
 
+        // Guardamos los datos en la variable global
+        todasLasEstaciones = data;
+        
+        // Llamamos a la función de filtrado inicial (mostrará todo porque los filtros están vacíos)
+        aplicarFiltros();
+    }
+
+    // NUEVA FUNCIÓN: Lógica de filtrado en tiempo real
+    function aplicarFiltros() {
+        const valUbicacion = document.getElementById('filtro-ubicacion').value.toLowerCase();
+        const valSolicitante = document.getElementById('filtro-solicitante').value.toLowerCase();
+        const valFecha = document.getElementById('filtro-fecha').value; // Formato YYYY-MM-DD
+
+        const datosFiltrados = todasLasEstaciones.filter(estacion => {
+            const ubicacionMatch = estacion.ubicacion.toLowerCase().includes(valUbicacion);
+            const solicitante = estacion.solicitante ? estacion.solicitante.toLowerCase() : '';
+            const solicitanteMatch = solicitante.includes(valSolicitante);
+            
+            let fechaMatch = true;
+            if (valFecha) {
+                // Compara si la fecha guardada empieza con la fecha seleccionada en el filtro
+                fechaMatch = estacion.fecha_requerida.startsWith(valFecha);
+            }
+
+            return ubicacionMatch && solicitanteMatch && fechaMatch;
+        });
+
+        renderizarTarjetas(datosFiltrados);
+    }
+
+    // NUEVA FUNCIÓN: Dibuja las tarjetas en pantalla basándose en los datos que reciba
+    function renderizarTarjetas(datos) {
+        const contenedor = document.getElementById('contenedor-tarjetas');
         contenedor.innerHTML = ''; 
 
-        if (data.length === 0) {
-            contenedor.innerHTML = '<div class="text-center text-muted mt-4">No hay estaciones pendientes. El campus está optimizado.</div>';
+        if (datos.length === 0) {
+            contenedor.innerHTML = '<div class="text-center text-muted mt-4">No se encontraron estaciones con esos filtros.</div>';
             return;
         }
 
-        data.forEach(estacion => {
+        datos.forEach(estacion => {
             const fechaOptimizada = new Date(estacion.fecha_requerida).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
             const solicitante = estacion.solicitante ? estacion.solicitante : 'Usuario no registrado';
             
-            // Construir el bloque visual de recargas si aplica
             let infoRecargas = '';
             if (estacion.lleva_recargas === 'Si' && estacion.horas_recargas) {
                 infoRecargas = `<div class="recarga-badge">🔄 Recargas: ${estacion.horas_recargas}</div>`;
@@ -165,6 +219,12 @@
         });
     }
 
+    // Event Listeners para que los filtros funcionen mientras se escribe o selecciona
+    document.getElementById('filtro-ubicacion').addEventListener('input', aplicarFiltros);
+    document.getElementById('filtro-solicitante').addEventListener('input', aplicarFiltros);
+    document.getElementById('filtro-fecha').addEventListener('change', aplicarFiltros);
+
+    // Registro de nueva estación
     document.getElementById('formulario-estacion').addEventListener('submit', async function(e) {
         e.preventDefault(); 
 
@@ -172,7 +232,6 @@
         const ubicacion = document.getElementById('ubicacion').value;
         const fechaReq = document.getElementById('fecha_requerida').value;
         
-        // Recargas
         const llevaRecargas = document.querySelector('input[name="opcionRecarga"]:checked').value;
         let horasRecargas = null;
         if (llevaRecargas === 'Si') {
@@ -203,9 +262,8 @@
         if (error) {
             mostrarAlerta('Error en la comunicación: ' + error.message, 'danger');
         } else {
-            mostrarAlerta('Datos guardados exitosamente. Optimizando insumos...', 'success');
+            mostrarAlerta('Datos guardados exitosamente.', 'success');
             document.getElementById('formulario-estacion').reset(); 
-            // Ocultar de nuevo el campo de horas tras limpiar el form
             document.getElementById('divHorasRecargas').classList.add('d-none');
             cargarEstaciones(); 
         }
@@ -220,5 +278,4 @@
     window.onload = cargarEstaciones;
 </script>
 </body>
-</html>
 </html>
