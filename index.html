@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECO-S | Logística estaciones</title>
+    <title>ECO-S | Logística de Espacios</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -27,7 +27,7 @@
 <body>
 
 <div class="eco-header text-center mb-5">
-    <h1>ECO-S: Registro y seguimiento estaciones de café</h1>
+    <h1>ECO-S: Dashboard Logístico</h1>
     <p>Gestión Inteligente y Sostenible de Insumos - Planta Física</p>
 </div>
 
@@ -49,12 +49,17 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label text-muted" id="label-fecha">Fecha y Hora del servicio</label>
+                        <label class="form-label text-muted" id="label-fecha">Fecha y Hora de la Sesión</label>
                         <input type="datetime-local" class="form-control" id="fecha_requerida" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label text-muted d-block" style="font-size: 0.9em;">¿La solicitud tiene varias fechas?</label>
+                        <label class="form-label text-muted">Cantidad de personas (Aforo estimado)</label>
+                        <input type="number" class="form-control" id="cantidad_personas" placeholder="Ej: 25" min="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted d-block" style="font-size: 0.9em;">¿La solicitud aplica para varias fechas?</label>
                         <div class="form-check form-check-inline">
                             <input class="form-check-input" type="radio" name="opcionMultiplesFechas" id="multiFechasSi" value="Si">
                             <label class="form-check-label" for="multiFechasSi">Sí</label>
@@ -72,22 +77,18 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label text-muted">Requerimientos</label>
+                        <label class="form-label text-muted">Insumos Requeridos</label>
                         <div class="form-check">
                             <input class="form-check-input insumo-check" type="checkbox" value="Café" id="chkCafe">
-                            <label class="form-check-label" for="chkCafe">Café (Termo)</label>
+                            <label class="form-check-label" for="chkCafe">Café (Termo 2L)</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input insumo-check" type="checkbox" value="Agua" id="chkAgua">
-                            <label class="form-check-label" for="chkAgua">Agua (Botellón)</label>
+                            <label class="form-check-label" for="chkAgua">Agua (Dispensador)</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input insumo-check" type="checkbox" value="Aromática" id="chkAro">
-                            <label class="form-check-label" for="chkAro">Aromáticas (Termo)</label>
-                        </div>
-                         <div class="form-check">
-                            <input class="form-check-input insumo-check" type="checkbox" value="Aromática" id="chkAro">
-                            <label class="form-check-label" for="chkAro">Mesa refrigerios</label>
+                            <label class="form-check-label" for="chkAro">Aromáticas variadas</label>
                         </div>
                     </div>
 
@@ -108,7 +109,7 @@
                         <input type="text" class="form-control" id="horas_recargas" placeholder="Ej: 10:00 am y 3:00 pm">
                     </div>
 
-                    <button type="submit" class="btn btn-success w-100 mt-3">Registrar</button>
+                    <button type="submit" class="btn btn-success w-100 mt-3">Registrar y Procesar</button>
                     <div id="mensaje-alerta" class="mt-3"></div>
                 </form>
             </div>
@@ -117,7 +118,7 @@
         <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-secondary">Monitoreo de Estaciones Activas</h4>
-                <button class="btn btn-outline-secondary btn-sm" onclick="cargarEstaciones()">↻ Recargar Datos</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="cargarEstaciones()">↻ Actualizar Datos</button>
             </div>
             
             <div class="filter-bar">
@@ -138,7 +139,7 @@
             </div>
 
             <div id="contenedor-tarjetas" class="row">
-                <div class="text-center text-muted mt-5">Cargando datos...</div>
+                <div class="text-center text-muted mt-5">Cargando la red espacial...</div>
             </div>
         </div>
     </div>
@@ -246,8 +247,8 @@
         datos.forEach(estacion => {
             const fechaOptimizada = new Date(estacion.fecha_requerida).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
             const solicitante = estacion.solicitante ? estacion.solicitante : 'Usuario no registrado';
+            const personas = estacion.cantidad_personas ? `${estacion.cantidad_personas} personas` : 'No especificado';
             
-            // Evaluar estado actual de la fila
             const esInstalado = estacion.estado === 'Instalado';
             const claseCard = esInstalado ? 'card-instalada' : 'card-pendiente';
             const claseBadge = esInstalado ? 'estado-instalado' : 'estado-pendiente';
@@ -258,7 +259,6 @@
                 infoRecargas = `<div class="recarga-badge">🔄 Recargas: ${estacion.horas_recargas}</div>`;
             }
             
-            // NUEVO: Bloque interactivo para el Supervisor/Verificador
             let bloqueSupervisor = '';
             if (!esInstalado) {
                 bloqueSupervisor = `
@@ -268,7 +268,6 @@
                     </div>
                 `;
             } else {
-                // Si ya está instalado, mostramos la novedad fija si existe
                 const novedadGuardada = estacion.novedades ? estacion.novedades : 'Ninguna novedad registrada.';
                 bloqueSupervisor = `
                     <div class="zona-supervisor text-secondary" style="font-size: 0.85em;">
@@ -285,7 +284,7 @@
                             <h5 class="card-title text-dark mb-1">📍 ${estacion.ubicacion}</h5>
                             <span class="${claseBadge}">${textoEstado}</span>
                         </div>
-                        <p class="text-muted mb-2" style="font-size: 0.9em;">👤 ${solicitante}</p>
+                        <p class="text-muted mb-2" style="font-size: 0.9em;">👤 ${solicitante} | 👥 Aforo: ${personas}</p>
                         <hr class="text-muted mt-1 mb-2">
                         <p class="card-text mb-1"><strong>⏰ Inicio:</strong> ${fechaOptimizada}</p>
                         <p class="card-text mb-1"><strong>☕ Insumos:</strong> ${estacion.insumos}</p>
@@ -298,12 +297,10 @@
         });
     }
 
-    // NUEVA FUNCIÓN: Envía la actualización de estado y novedad a Supabase
     async function confirmarInstalacion(idEstacion) {
         const inputNovedad = document.getElementById(`nov-${idEstacion}`);
         const textoNovedad = inputNovedad.value.trim();
 
-        // Actualizamos la fila específica en Supabase usando el ID
         const { data, error } = await supabaseClient
             .from('estaciones_cafe')
             .update({ 
@@ -315,7 +312,6 @@
         if (error) {
             alert('Error al actualizar el estado: ' + error.message);
         } else {
-            // Recargamos el dashboard visual instantáneamente
             cargarEstaciones();
         }
     }
@@ -324,13 +320,14 @@
     document.getElementById('filtro-solicitante').addEventListener('input', aplicarFiltros);
     document.getElementById('filtro-fecha').addEventListener('change', aplicarFiltros);
 
-    // Registro de nuevas solicitudes (soporta multi-fechas)
+    // Registro de nuevas solicitudes
     document.getElementById('formulario-estacion').addEventListener('submit', async function(e) {
         e.preventDefault(); 
 
         const solicitante = document.getElementById('solicitante').value;
         const ubicacion = document.getElementById('ubicacion').value;
         const fechaPrincipal = document.getElementById('fecha_requerida').value;
+        const cantidadPersonas = parseInt(document.getElementById('cantidad_personas').value);
         
         const llevaRecargas = document.querySelector('input[name="opcionRecarga"]:checked').value;
         let horasRecargas = null;
@@ -347,8 +344,8 @@
         let filasAInsertar = [
             { 
                 solicitante: solicitante, ubicacion: ubicacion, fecha_requerida: fechaPrincipal, 
-                insumos: insumosSeleccionados, lleva_recargas: llevaRecargas, horas_recargas: horasRecargas,
-                estado: 'Pendiente' // Se guardan inicialmente como pendientes
+                cantidad_personas: cantidadPersonas, insumos: insumosSeleccionados, 
+                lleva_recargas: llevaRecargas, horas_recargas: horasRecargas, estado: 'Pendiente'
             }
         ];
 
@@ -359,8 +356,8 @@
                 if(input.value) {
                     filasAInsertar.push({
                         solicitante: solicitante, ubicacion: ubicacion, fecha_requerida: input.value, 
-                        insumos: insumosSeleccionados, lleva_recargas: llevaRecargas, horas_recargas: horasRecargas,
-                        estado: 'Pendiente'
+                        cantidad_personas: cantidadPersonas, insumos: insumosSeleccionados, 
+                        lleva_recargas: llevaRecargas, horas_recargas: horasRecargas, estado: 'Pendiente'
                     });
                 }
             });
